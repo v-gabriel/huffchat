@@ -50,8 +50,6 @@ Found in:
 - *\HuffChat\HuffChat.Server\bin\Release\net6.0* and *\HuffChat\HuffChat.Client\bin\Release\net6.0* or
 - *\HuffChat\HuffChat.Server\bin\Debug\net6.0* and *\HuffChat\HuffChat.Client\bin\Debug\net6.0* 
 
-First, start the Server. Each Client instance will connect a different user with randomly generated display name to the host machine.
-
 <br>
 
 #### 3. Using Visual Studio 
