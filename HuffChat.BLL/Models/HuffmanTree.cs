@@ -7,6 +7,7 @@ namespace HuffChat.BLL.Models
         private List<Node> nodes = new List<Node>();
         public Node Root { get; set; }
         public Dictionary<char, int> Frequencies = new Dictionary<char, int>();
+        public bool isBuilt { get; private set; } = false;
 
         public void Build(string source)
         {
@@ -48,6 +49,7 @@ namespace HuffChat.BLL.Models
 
                 this.Root = nodes.FirstOrDefault();
             }
+            isBuilt = true;
         }
 
         public BitArray Encode(string source)

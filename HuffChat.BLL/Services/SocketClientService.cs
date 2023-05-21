@@ -1,4 +1,5 @@
 ﻿using HuffChat.BLL.Enums;
+using HuffChat.BLL.Models;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -7,8 +8,18 @@ namespace HuffChat.BLL.Services
 {
     public class SocketClientService
     {
+        private bool isFirstConnect = true;
+
         Socket? client = null;
         Thread? thread = null;
+
+        HuffmanTree huffmanTree = new HuffmanTree();
+
+        public SocketClientService()
+        {
+            // TODO: Add feature for only 1:1 Sockets (works only if Client-Server start at the same time)
+            //huffmanTree.Build(AppConstants.HUFFMAN_DEFAULT_BUILD_INPUT);
+        }
 
         public async Task Start(string[] args)
         {
@@ -60,13 +71,21 @@ namespace HuffChat.BLL.Services
                 Console.WriteLine("\n");
                 while (true)
                 {
-                    string? message = Console.ReadLine() ?? String.Empty;
+                    if (this.huffmanTree.isBuilt)
+                    {
+                        string? message = Console.ReadLine() ?? String.Empty;
 
-                    message = $"[{displayName}] {message}";
-                    message += SocketResponse.END_OF_MESSAGE; ;
+                        message = $"[{displayName}] {message}";
+                        message += SocketResponse.END_OF_MESSAGE; ;
 
-                    var messageBytes = Encoding.UTF8.GetBytes(message);
-                    _ = await client.SendAsync(messageBytes, SocketFlags.None);
+                        string? encodedMessage = String.Empty;
+                        var encodedBits = huffmanTree.Encode(message);
+                        encodedMessage = ParserHelper.ParseStringFromBitArray(encodedBits);
+
+                        var messageBytes = Encoding.UTF8.GetBytes(encodedMessage += SocketResponse.END_OF_MESSAGE);
+
+                        _ = await client.SendAsync(messageBytes, SocketFlags.None);
+                    }
                 }
             }
             catch (Exception ex)
@@ -88,9 +107,21 @@ namespace HuffChat.BLL.Services
                     var buffer = new byte[1_024];
                     var received = await client.ReceiveAsync(buffer, SocketFlags.None);
                     var response = Encoding.UTF8.GetString(buffer, 0, received);
+
+                    if (isFirstConnect)
+                    {
+                        huffmanTree.Build(response);
+                        isFirstConnect = false;
+                    }
+
                     if (response.IndexOf(SocketResponse.END_OF_MESSAGE) > -1)
                     {
-                        var reply = $"$: {response.Replace(SocketResponse.END_OF_MESSAGE, "")}";
+                        var bitMessage = ParserHelper.ParseBitArrayFromString(response);
+                        var decoded = huffmanTree.Decode(bitMessage).ToString() ?? SocketResponse.END_OF_MESSAGE;
+                        // TODO: Fix parsing (decodedMessage has an extra char at the end)
+                        decoded = decoded.Substring(0, decoded.Length - 1);
+
+                        var reply = $"$: {decoded.Replace(SocketResponse.END_OF_MESSAGE, "")}";
                         Console.WriteLine(reply);
                     }
                 }

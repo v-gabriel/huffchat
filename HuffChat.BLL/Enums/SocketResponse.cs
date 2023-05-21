@@ -2,6 +2,6 @@
 {
     public static class SocketResponse
     {
-        public static readonly string END_OF_MESSAGE = "<|EOM|>";
+        public static readonly string END_OF_MESSAGE = "[<|EOM|>]";
     }
 }
