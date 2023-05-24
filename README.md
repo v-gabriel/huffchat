@@ -4,14 +4,17 @@ Simple TCP chat using Sockets (.NET).
 
 Encoded using Huffman coding.
 
-> **Note** <br>
-Init version without Huffman encoding.
-
 <br>
 
 ## Info
 
 Sockets are initialized through a single Server and multiple Client executables.
+
+Huffman tree generator input is generated during Server setup (check *AppConstants.cs* in *HuffChat.BLL* project).
+
+First Server response to the Client is the Huffman generator input needed for sending encoded and decoding incoming messages.
+
+There are some stability issues, try to wait a few seconds before sending each message.
 
 ### Start options
 
