@@ -8,8 +8,6 @@ namespace HuffChat.BLL.Services
 {
     public class SocketServerService
     {
-        private bool isFirstConnect = true;
-
         List<Thread> threads = new List<Thread>();
         List<Socket> handlers = new List<Socket>();
 
@@ -46,12 +44,18 @@ namespace HuffChat.BLL.Services
                 listener.Listen(100);
 
 #if DEBUG
-                Console.WriteLine($"S$ Started Socket Server.");
+                Console.WriteLine($"S$ Started Socket Server\n$ IP endpoint: {ipEndpoint}");
 #else
-                    Console.WriteLine($"S$ Started Socket Server\n$ IP endpoint: {ipEndpoint}");
+                Console.WriteLine($"S$ Started Socket Server.");
 #endif
                 Console.WriteLine("\n");
-                await AcceptNextConnection(listener);
+
+                var mainThread = new Thread(async () =>
+                {
+                    await AcceptNextConnection(listener);
+                });
+                mainThread.Start();
+                while (true) { }
             }
             catch (Exception ex)
             {
@@ -71,41 +75,63 @@ namespace HuffChat.BLL.Services
             thread.Start();
             threads.Add(thread);
             handlers.Add(handler);
-
-            while (true)
+            
+            try
             {
-                if (isFirstConnect)
+                while (true)
                 {
-                    var encodingInput = AppConstants.HUFFMAN_DEFAULT_BUILD_INPUT;
-                    var echoBytes = Encoding.UTF8.GetBytes(encodingInput);
-                    foreach (var h in handlers)
+                    if (!handler.Connected)
                     {
-                        await h.SendAsync(echoBytes, 0);
+                        break;
                     }
-                    isFirstConnect = false;
-                }
-
-                var buffer = new byte[1_024];
-                var received = await handler.ReceiveAsync(buffer, SocketFlags.None);
-                var response = Encoding.UTF8.GetString(buffer, 0, received);
-
-                if (response.IndexOf(SocketResponse.END_OF_MESSAGE) > -1)
-                {
-                    var bitMessage = ParserHelper.ParseBitArrayFromString(response);
-                    var decoded = huffmanTree.Decode(bitMessage).ToString() ?? SocketResponse.END_OF_MESSAGE;
-
-                    var reply = $"$: {decoded.Replace(SocketResponse.END_OF_MESSAGE, "")}";
-                    // TODO: Fix parsing (decodedMessage has an extra char at the end)
-                    reply = reply.Substring(0, reply.Length - 1);
-                    Console.WriteLine($"{reply}");
-
-                    var echoBytes = Encoding.UTF8.GetBytes(response);
-                    foreach (var h in handlers)
+                    if (isFirstConnect)
                     {
-                        await h.SendAsync(echoBytes, 0);
+                        var encodingInput = AppConstants.HUFFMAN_DEFAULT_BUILD_INPUT;
+                        var echoBytes = Encoding.UTF8.GetBytes(encodingInput);
+                        foreach (var h in handlers)
+                        {
+                            await h.SendAsync(echoBytes, SocketFlags.None);
+                        }
+                        isFirstConnect = false;
+                    }
+
+                    var buffer = new byte[1_024];
+                    var received = await handler.ReceiveAsync(buffer, SocketFlags.None);
+                    var response = Encoding.UTF8.GetString(buffer, 0, received);
+
+                    if (response.IndexOf(SocketResponse.END_OF_MESSAGE) > -1)
+                    {
+                        var bitMessage = ParserHelper.ParseBitArrayFromString(response);
+                        var decoded = huffmanTree.Decode(bitMessage).ToString() ?? "";
+
+                        var reply = $"$: {decoded.Replace(SocketResponse.END_OF_MESSAGE, "")}";
+                        // TODO: Fix parsing (decodedMessage has an extra char at the end)
+                        reply = reply.Substring(0, reply.Length - 1);
+                        Console.WriteLine($"{reply}");
+
+                        var echoBytes = Encoding.UTF8.GetBytes(response);
+                        foreach (var h in handlers.Where(x => x.Connected))
+                        {
+                            await h.SendAsync(echoBytes, SocketFlags.None);
+                        }
                     }
                 }
+                this.cleanHandler(handler);
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"\nS$ Error: {ex.Message}\n");
+            }
+            finally
+            {
+                this.cleanHandler(handler);
+            }
+        }
+
+        private void cleanHandler(Socket handler)
+        {
+            this.handlers.Remove(handler);
+            handler.Close();
         }
     }
 }

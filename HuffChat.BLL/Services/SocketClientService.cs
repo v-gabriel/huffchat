@@ -8,8 +8,6 @@ namespace HuffChat.BLL.Services
 {
     public class SocketClientService
     {
-        private bool isFirstConnect = true;
-
         Socket? client = null;
         Thread? thread = null;
 
@@ -54,56 +52,68 @@ namespace HuffChat.BLL.Services
 
                 IPEndPoint ipEndPoint = new(ipAddress, 11_000);
 
-                client = new(
+                Socket client = new(
                     ipEndPoint.AddressFamily,
                     SocketType.Stream,
                     ProtocolType.Tcp
                 );
 
                 await client.ConnectAsync(ipEndPoint);
+
                 thread = new Thread(async () =>
                 {
-                    await ReplyListener();
+                    await ReplyListener(client);
                 });
                 thread.Start();
 
+                while (!this.huffmanTree.isBuilt) { }
                 Console.WriteLine($"C$ Connection established, you can send messages now.");
                 Console.WriteLine("\n");
                 while (true)
                 {
-                    if (this.huffmanTree.isBuilt)
+                    if (!client.Connected)
                     {
-                        string? message = Console.ReadLine() ?? String.Empty;
-
-                        message = $"[{displayName}] {message}";
-                        message += SocketResponse.END_OF_MESSAGE; ;
-
-                        string? encodedMessage = String.Empty;
-                        var encodedBits = huffmanTree.Encode(message);
-                        encodedMessage = ParserHelper.ParseStringFromBitArray(encodedBits);
-
-                        var messageBytes = Encoding.UTF8.GetBytes(encodedMessage += SocketResponse.END_OF_MESSAGE);
-
-                        _ = await client.SendAsync(messageBytes, SocketFlags.None);
+                        break;
                     }
+                    string? message = Console.ReadLine() ?? String.Empty;
+
+                    message = $"[{displayName}] {message}";
+
+                    string? encodedMessage = String.Empty;
+                    var encodedBits = huffmanTree.Encode(message);
+                    encodedMessage = ParserHelper.ParseStringFromBitArray(encodedBits);
+
+                    var messageBytes = Encoding.UTF8.GetBytes(encodedMessage += SocketResponse.END_OF_MESSAGE);
+
+                    _ = await client.SendAsync(messageBytes, SocketFlags.None);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
+                Console.WriteLine($"\nC$ Sender Error: {ex.StackTrace}\n");
             }
             finally
             {
-                client?.Shutdown(SocketShutdown.Send);
+                client?.Close();
             }
         }
 
-        private async Task ReplyListener()
+        private async Task ReplyListener(Socket? client)
         {
-            while(true)
+            if (client == null)
             {
-                if (client != null)
+                return;
+            }
+
+            var isFirstConnect = true;
+            try
+            {
+                while (true)
                 {
+                    if (!client.Connected)
+                    {
+                        break;
+                    }
                     var buffer = new byte[1_024];
                     var received = await client.ReceiveAsync(buffer, SocketFlags.None);
                     var response = Encoding.UTF8.GetString(buffer, 0, received);
@@ -117,7 +127,7 @@ namespace HuffChat.BLL.Services
                     if (response.IndexOf(SocketResponse.END_OF_MESSAGE) > -1)
                     {
                         var bitMessage = ParserHelper.ParseBitArrayFromString(response);
-                        var decoded = huffmanTree.Decode(bitMessage).ToString() ?? SocketResponse.END_OF_MESSAGE;
+                        var decoded = huffmanTree.Decode(bitMessage).ToString() ?? "";
                         // TODO: Fix parsing (decodedMessage has an extra char at the end)
                         decoded = decoded.Substring(0, decoded.Length - 1);
 
@@ -125,6 +135,14 @@ namespace HuffChat.BLL.Services
                         Console.WriteLine(reply);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"\nC$ Listener Error: {ex.StackTrace}\n");
+            }
+            finally
+            {
+                client?.Close();
             }
         }
     }
