@@ -14,8 +14,6 @@ Huffman tree generator input is generated during Server setup (check *AppConstan
 
 First Server response to the Client is the Huffman generator input needed for sending encoded and decoding incoming messages.
 
-There are some stability issues, try to wait a few seconds before sending each message.
-
 ### Start options
 
 #### 1. Using terminal and dotnet CLI
@@ -65,7 +63,12 @@ Runs 2 instances - 1 Server and 1 Client. Both will be connected to host machine
 
 ### Using executables
 
-//TODO
+Server with 3 connected Clients.
+
+Testing messaging and disconnects.
+
+https://github.com/v-gabriel/huffchat/assets/72694712/a2659211-3803-47fd-912b-4c632940f663
+
 
 <br>
 
